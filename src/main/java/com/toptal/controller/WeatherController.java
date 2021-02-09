@@ -24,9 +24,8 @@ import tk.plogitech.darksky.forecast.model.Latitude;
 import tk.plogitech.darksky.forecast.model.Longitude;
 
 public class WeatherController {
-	String getWeather(String location) {
-		
-		
+	public String getWeather(String location) {
+
         try {
         	OkHttpClient client = new OkHttpClient();
         	Request request = new Request.Builder()

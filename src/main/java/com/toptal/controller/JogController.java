@@ -9,67 +9,56 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
+import javax.persistence.EntityNotFoundException;
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.rest.core.annotation.RestResource;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import com.toptal.JogRepository;
 import com.toptal.model.Jog;
-
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-
-import tk.plogitech.darksky.forecast.APIKey;
-import tk.plogitech.darksky.forecast.ForecastException;
-import tk.plogitech.darksky.forecast.ForecastRequest;
-import tk.plogitech.darksky.forecast.ForecastRequestBuilder;
-import tk.plogitech.darksky.forecast.GeoCoordinates;
-import tk.plogitech.darksky.forecast.model.Forecast;
-import tk.plogitech.darksky.forecast.model.Latitude;
-import tk.plogitech.darksky.forecast.model.Longitude;
-
-import com.toptal.JogRepo;
-
-import java.net.URLEncoder;
-import java.time.ZoneOffset;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mashape.unirest.http.HttpResponse;
-import com.mashape.unirest.http.JsonNode;
-import com.mashape.unirest.http.Unirest;
+import com.toptal.model.Role;
+import com.toptal.model.User;
+import com.toptal.security.UserPrincipal;
+import com.toptal.setup.Processor;
 
 @RestController
 public class JogController {
 
 	@Autowired
-	JogRepo repo;
+	JogRepository repo;
 	
 	
-	@RequestMapping(value = "/jogs/query/{query}", params = { "page", "size" })
+	@Autowired
+	Processor reportService;
+	
+	
+	@RequestMapping(value = "/jogs/query/{query}")
 	@ResponseBody
-	public Page<Jog> findByQuery(@PathVariable("query") String query, Pageable p,
-			@RequestParam("page") int page, 
-			  @RequestParam("size") int size, UriComponentsBuilder uriBuilder,
-			  HttpServletResponse response) {
+	@PreAuthorize("hasAnyAuthority('ADMIN', 'USER')")
+	public Page<Jog> findByQuery(@PathVariable("query") String query, Pageable p) {
+			//, @RequestParam(value = "page", required = false) Integer page, 
+			//  @RequestParam(value = "size", required = false, defaultValue = 5) Integer size, UriComponentsBuilder uriBuilder,
+			//  HttpServletResponse response) {
 		
 		Deque<String> brackets = new ArrayDeque<>();
 		Deque<List<Jog>> queryResults = new ArrayDeque<>();
@@ -170,8 +159,9 @@ public class JogController {
 		combinedResults = combineProcess(combinedResults, operands, queryResults);
 		System.out.println("Combined Results (main method)"+combinedResults.toString());
 		System.out.println("Query line 2: "+queryResults.toString());
+		// If current user is Admin, return the results. Otherwise, filter for current User only.
+		//filtered(combinedResults);
 		// Now finalize into Page object
-		
 		Page<Jog> finalResult = toPage(combinedResults, p);
 		
 		return finalResult;		
@@ -190,6 +180,24 @@ public class JogController {
 		List<Jog> subList = list.subList(startIndex, endIndex);
 		return new PageImpl<Jog>(subList, pageable, list.size());
 	}
+	
+	private void filtered(List<Jog> results) {
+		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    	User loggedInUser = ((UserPrincipal)auth.getPrincipal()).getUser();
+    	Role curOrgName = loggedInUser.getOrganization().getName();
+    	
+    	if (curOrgName.equals(Role.ADMIN)) {
+    		return;
+    	}
+    	
+    	for (int i = 0; i<results.size(); i++) {
+    		if (results.get(i).getUser().getId()!=loggedInUser.getId()) {
+    			results.remove(i);
+    			i--;
+    		}
+    	}
+	}
+	
 	
 	// This is helper function
 	private List<Jog> executeQuery(String query, Pageable p) {
@@ -360,14 +368,133 @@ public class JogController {
 	}
 	*/
 	
+	@ResponseBody
+	@PreAuthorize("hasAnyAuthority('ADMIN', 'USER')")
 	@PostMapping(path="/jog", consumes={"application/json"})
 	public Jog addJog(@RequestBody Jog jog) {
 		WeatherController wc = new WeatherController();
-		System.out.println(jog.getLocation());
+		//System.out.println(jog.getLocation());
 		jog.setWeather(wc.getWeather(jog.getLocation()));
+		
+		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    	User loggedInUser = ((UserPrincipal)auth.getPrincipal()).getUser();
+    	
+    	jog.setUser(loggedInUser);
+    	
 		repo.save(jog);
+		reportService.addJogToReport(jog);
 		return jog;
 	}
+	
+	@GetMapping(path ="/jog/{id}", produces= {"application/json"})
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'USER')")
+    @ResponseBody
+    public Optional<Jog> findById(@PathVariable long id) {
+        Optional<Jog> res = repo.findById(id);
+        if (res.isPresent()) {
+        	Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        	User loggedInUser = ((UserPrincipal)auth.getPrincipal()).getUser();
+        	if (res.get().getUser().getId()!=loggedInUser.getId()) {
+        		return Optional.empty();
+        	}
+        }
+        
+        return res;
+	}
+	
+	@GetMapping(path ="/jogs", produces= {"application/json"})
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'USER')")
+    @ResponseBody
+    public Page<Jog> findJogsByUserId(Pageable p) {
+		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    	User loggedInUser = ((UserPrincipal)auth.getPrincipal()).getUser();
+    	Page<Jog> result;
+    	if (loggedInUser.getOrganization().getName().equals((Role.ADMIN))) {
+    		result = repo.findAll(p);
+    	} else {
+    		result = repo.getJogsByUserId(loggedInUser.getId(), p);
+    	}
+                
+        return result;
+	}
+	
+	@ResponseBody
+	@PreAuthorize("hasAnyAuthority('ADMIN', 'USER')")
+	@PutMapping(path="/jog/{id}", consumes={"application/json"})
+	public Jog updateJog(@RequestBody Jog jog, @PathVariable Long id) {
+		Optional<Jog> storedJog = repo.findById(id);
+		if (storedJog.isPresent() && jog.getId()==id) {
+			throw new DataIntegrityViolationException("You are attemping to change an existing ID to another ID. You are not allowed to do that.");
+		}
+		if (storedJog.isPresent()) {
+			// check if ID matches
+			Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+	    	User loggedInUser = ((UserPrincipal)auth.getPrincipal()).getUser();
+	    	Role curOrgName = loggedInUser.getOrganization().getName();
+	    	
+	    	Jog _stored = storedJog.get();
+	    	// Update will happen if logged in User is Admin or if loggedIn user is User and Jog's User ID matches loggedIn User's user ID
+	    	if (curOrgName.equals(Role.ADMIN) || loggedInUser.getId()==_stored.getUser().getId()) {
+	    		// then update straightaway
+	    		if (!jog.getLocation().isBlank()) {
+	    			_stored.setLocation(jog.getLocation());
+	    		}
+	    		if (!jog.getDate().toString().isBlank()) {
+	    			_stored.setDate(jog.getDate());
+	    		}
+	    		if (!jog.getTime().isBlank()) {
+	    			_stored.setTime(jog.getTime());
+	    		}
+	    		if (jog.getUser()!=null && jog.getUser().getId()!=_stored.getUser().getId() && curOrgName.equals(Role.ADMIN)) {
+	    			// admin could change user details of the Jog
+	    			try {
+	    				_stored.setUser(jog.getUser());
+	    			} catch (Exception d) {
+	    				throw new DataIntegrityViolationException("As an ADMIN, you can change the User of the jog, but your JSON for User is not correct.");
+	    			}
+	    		}
+	    		
+	    		_stored.setDistance(jog.getDistance());
+	    		_stored.setMinutes(jog.getMinutes());
+	    		
+    			// API for historical weather records requires money so we will just assume
+    			// user entry is correct
+    			_stored.setWeather(jog.getWeather());
+    			repo.save(_stored);
+    			reportService.updateJogInReport(_stored, jog);
+    			return _stored;
+	    	} else {
+	    		// update is not allowed because current user is a manager or current user does not own that Jog ID
+	    		throw new DataIntegrityViolationException("You are a "+curOrgName+" and you do not own this Jog ID.");
+	    	}
+		} 
+		
+		// the id param was not found, so this is a new jog
+		return addJog(jog);
+	}
+	
+	@ResponseBody
+	@PreAuthorize("hasAnyAuthority('ADMIN', 'USER')")
+	@DeleteMapping(path="/jog/{id}", consumes={"application/json"})
+	public void deleteJogById(@PathVariable Long id) {
+		Optional<Jog> storedJog = repo.findById(id);
+		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    	User loggedInUser = ((UserPrincipal)auth.getPrincipal()).getUser();
+    	Role curOrgName = loggedInUser.getOrganization().getName();
+		if (storedJog.isPresent()) {
+			if (curOrgName.equals(Role.ADMIN) || loggedInUser.getId()==storedJog.get().getUser().getId()) {
+				repo.deleteById(storedJog.get().getId());
+				reportService.deleteJogInReport(storedJog.get());
+			} else {
+				throw new DataIntegrityViolationException("You are a "+curOrgName+" and you do not own this Jog ID.");
+			}
+		} else {
+			throw new EntityNotFoundException("Your Jog ID was not found!");
+		}
+		
+	}
+	
+	/////////////////////////////////////////////////////////////////////////////////////////////
 	
 	
 }

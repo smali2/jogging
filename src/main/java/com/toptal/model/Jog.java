@@ -7,9 +7,14 @@ import java.sql.Time;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 import javax.persistence.*;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonSetter;
 
 
 /**
@@ -21,7 +26,8 @@ public class Jog {
 	
 	@Id
 	@GeneratedValue(strategy=GenerationType.IDENTITY)
-	private int id;
+	private Long id;
+	
 	private String date;
 	private String time;
 	private float distance;
@@ -29,10 +35,23 @@ public class Jog {
 	private String location;
 	private String weather;
 	
-	public int getId() {
+	@ManyToOne(fetch = FetchType.EAGER)
+	@JoinColumn(name = "user_id")
+	private User user;
+	
+	//@JsonIgnore
+	public User getUser() {
+		return user;
+	}
+	//@JsonSetter
+	public void setUser(User user) {
+		this.user = user;
+	}
+	
+	public Long getId() {
 		return id;
 	}
-	public void setId(int id) {
+	public void setId(Long id) {
 		this.id = id;
 	}
 	public Date getDate() {
@@ -45,6 +64,7 @@ public class Jog {
 			      */
 		this.date = date;
 	}
+	
 	public void setDate(Date date) {
 		this.date = date.toInstant()
 			      .atZone(ZoneId.systemDefault())
@@ -62,8 +82,6 @@ public class Jog {
 	public void setLocation(String loc) {
 		this.location = loc;
 	}
-	
-	
 	
 	public String getTime() {
 		return time;

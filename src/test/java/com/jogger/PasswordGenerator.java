@@ -1,6 +1,6 @@
 // Bismillah Hirrahman Nirrahim
 
-package com.toptal;
+package com.jogger;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 

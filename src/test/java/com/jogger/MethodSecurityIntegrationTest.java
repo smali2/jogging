@@ -1,6 +1,6 @@
 //Bismillah Hirrahman Nirrahim
 
-package com.toptal;
+package com.jogger;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;

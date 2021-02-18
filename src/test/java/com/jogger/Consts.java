@@ -1,6 +1,6 @@
 // Bismillah Hirrahman Nirrahim
 
-package com.toptal;
+package com.jogger;
 
 public interface Consts {
     int APPLICATION_PORT = 8080;

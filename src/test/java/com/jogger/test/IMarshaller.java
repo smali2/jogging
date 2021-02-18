@@ -1,6 +1,6 @@
 // Bismillah Hirrahman Nirrahim
 
-package com.toptal.test;
+package com.jogger.test;
 
 import java.util.List;
 

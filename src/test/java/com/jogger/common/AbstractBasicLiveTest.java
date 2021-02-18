@@ -1,6 +1,6 @@
 // Bismillah Hirrahman Nirrahim
 
-package com.toptal.common;
+package com.jogger.common;
 
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
 import static org.apache.commons.lang3.RandomStringUtils.randomNumeric;

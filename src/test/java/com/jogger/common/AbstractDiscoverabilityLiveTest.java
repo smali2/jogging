@@ -1,6 +1,6 @@
 // Bismillah Hirrahman Nirrahim
 
-package com.toptal.common;
+package com.jogger.common;
 
 
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
@@ -16,7 +16,7 @@ import org.junit.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-import com.toptal.web.util.HTTPLinkHeaderUtil;
+import com.jogger.web.util.HTTPLinkHeaderUtil;
 
 import io.restassured.RestAssured;
 import io.restassured.response.Response;

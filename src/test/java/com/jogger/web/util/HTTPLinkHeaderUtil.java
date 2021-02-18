@@ -1,6 +1,6 @@
 // Bismillah Hirrahman Nirrahim
 
-package com.toptal.web.util;
+package com.jogger.web.util;
 
 public final class HTTPLinkHeaderUtil {
 

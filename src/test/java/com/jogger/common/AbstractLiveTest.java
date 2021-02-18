@@ -1,6 +1,6 @@
 // Bismillah Hirrahman Nirrahim
 
-package com.toptal.common;
+package com.jogger.common;
 
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
@@ -11,8 +11,8 @@ import org.assertj.core.util.Preconditions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-import com.toptal.Consts;
-import com.toptal.test.IMarshaller;
+import com.jogger.Consts;
+import com.jogger.test.IMarshaller;
 
 
 

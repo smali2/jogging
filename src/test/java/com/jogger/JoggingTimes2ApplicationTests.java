@@ -1,4 +1,4 @@
-package com.toptal;
+package com.jogger;
 
 import org.apache.coyote.Response;
 import org.junit.jupiter.api.Test;
